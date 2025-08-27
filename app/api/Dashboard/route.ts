@@ -1,43 +1,50 @@
 // app/api/dashboard/route.ts
-import { NextRequest, NextResponse } from "next/server"
-import jwt from "jsonwebtoken"
+import { type NextRequest, NextResponse } from "next/server"
+import { verifyToken } from "@/lib/auth"
 
-const SECRET = process.env.JWT_SECRET || "supersecret"
-
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    // 1. Header se token lena
-    const authHeader = req.headers.get("authorization")
-    if (!authHeader) {
-      return NextResponse.json({ error: "No token provided" }, { status: 401 })
+    // Token nikalna header se
+    const authHeader = request.headers.get("authorization")
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Authorization token missing" },
+        { status: 401 }
+      )
     }
 
-    const token = authHeader.split(" ")[1] // "Bearer <token>"
-    if (!token) {
-      return NextResponse.json({ error: "Invalid token format" }, { status: 401 })
+    const token = authHeader.split(" ")[1]
+    const payload = verifyToken(token)
+
+    if (!payload) {
+      return NextResponse.json(
+        { error: "Invalid or expired token" },
+        { status: 401 }
+      )
     }
 
-    // 2. Token verify karna
-    let decoded
-    try {
-      decoded = jwt.verify(token, SECRET)
-    } catch (err) {
-      return NextResponse.json({ error: "Invalid or expired token" }, { status: 403 })
-    }
-
-    // 3. Agar token sahi hai to user-specific data return karna
-    return NextResponse.json({
-      message: "Dashboard data fetched successfully ✅",
-      user: decoded,
-      data: {
-        courses: ["React", "Next.js", "Tailwind"],
-        notifications: [
-          "Welcome to your dashboard 🚀",
-          "You have a new message",
-        ],
+    // Yaha tu apna dynamic data laa sakta hai, jaise DB se
+    const dashboardData = {
+      message: "Welcome to your dashboard!",
+      user: {
+        id: payload.userId,
+        email: payload.email,
+        name: payload.name,
       },
-    })
-  } catch (err) {
-    return NextResponse.json({ error: "Server error" }, { status: 500 })
+      stats: {
+        totalProjects: 5,
+        completed: 3,
+        ongoing: 2,
+      },
+      lastLogin: new Date().toISOString(),
+    }
+
+    return NextResponse.json(dashboardData, { status: 200 })
+  } catch (error) {
+    console.error("Dashboard API error:", error)
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    )
   }
 }
