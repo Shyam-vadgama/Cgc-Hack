@@ -1,54 +1,61 @@
+// app/api/dashboard/route.ts
 import { type NextRequest, NextResponse } from "next/server"
-import { findUserByEmail } from "@/lib/db/users"
-import { verifyPassword, validateEmail, generateToken } from "@/lib/auth"
+import { verifyToken } from "@/lib/auth"  // JWT verify karne wala function
+import { findUserById } from "@/lib/db/users" // DB se user data nikalne wala
 
-export async function POST(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const body = await request.json()
-    const { email, password } = body
+    // 1. Header se token nikal
+    const authHeader = req.headers.get("authorization")
 
-    // Validate required fields
-    if (!email || !password) {
-      return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Unauthorized: Token missing" },
+        { status: 401 }
+      )
     }
 
-    // Validate email format
-    if (!validateEmail(email)) {
-      return NextResponse.json({ error: "Invalid email format" }, { status: 400 })
+    const token = authHeader.split(" ")[1]
+
+    // 2. Token verify
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return NextResponse.json(
+        { error: "Unauthorized: Invalid token" },
+        { status: 401 }
+      )
     }
 
-    // Find user by email
-    const user = await findUserByEmail(email.toLowerCase())
+    // 3. DB se user fetch
+    const user = await findUserById(decoded.userId)
     if (!user) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      )
     }
 
-    // Verify password
-    const isPasswordValid = await verifyPassword(password, user.password)
-    if (!isPasswordValid) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
-    }
-
-    // Generate JWT token
-    const token = generateToken({
-      userId: user._id!.toString(),
-      email: user.email,
-      name: user.name,
-    })
-
-    // Return success response (excluding password)
-    const { password: _, ...userWithoutPassword } = user
-
-    return NextResponse.json(
-      {
-        message: "Login successful",
-        user: userWithoutPassword,
-        token,
+    // 4. User-specific dashboard data
+    return NextResponse.json({
+      message: "Dashboard data fetched successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
       },
-      { status: 200 },
-    )
+      data: {
+        courses: ["React", "Next.js", "Tailwind"],
+        notifications: [
+          `Welcome back, ${user.name}!`,
+          "New course available",
+        ],
+      },
+    })
   } catch (error) {
-    console.error("Login error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Dashboard API error:", error)
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    )
   }
 }
