@@ -1,20 +1,35 @@
 "use client"
 
-import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
+  const [data, setData] = useState<any>(null)
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login")
+    const fetchData = async () => {
+      const res = await fetch("/api/dashboard", { method: "GET" })
+      if (res.ok) {
+        const json = await res.json()
+        setData(json)
+      } else {
+        setData({ error: "Unauthorized" })
+      }
     }
-  }, [status, router])
+    fetchData()
+  }, [])
 
-  if (status === "loading") return <p>Loading...</p>
+  if (!data) return <p>Loading...</p>
+  if (data.error) return <p className="text-red-500">{data.error}</p>
 
-  return <h1>Welcome {session?.user?.name} to Dashboard</h1>
+  return (
+    <div className="p-6">
+      <h1 className="text-3xl font-bold">Welcome, {data.user.name}</h1>
+      <h2 className="mt-4 text-xl">Courses:</h2>
+      <ul className="list-disc ml-6">
+        {data.data.courses.map((c: string) => (
+          <li key={c}>{c}</li>
+        ))}
+      </ul>
+    </div>
+  )
 }
