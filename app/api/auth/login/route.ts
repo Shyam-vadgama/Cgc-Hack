@@ -1,59 +1,51 @@
-import NextAuth from "next-auth"
-import CredentialsProvider from "next-auth/providers/credentials"
-import { verifyPassword } from "@/lib/auth"
+import { type NextRequest, NextResponse } from "next/server"
 import { findUserByEmail } from "@/lib/db/users"
+import { verifyPassword, validateEmail, generateToken } from "@/lib/auth"
 
-const handler = NextAuth({
-  providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "text" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { email, password } = body
 
-        const user = await findUserByEmail(credentials.email)
-        if (!user) return null
+    if (!email || !password) {
+      return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
+    }
 
-        const isValid = await verifyPassword(credentials.password, user.password)
-        if (!isValid) return null
+    if (!validateEmail(email)) {
+      return NextResponse.json({ error: "Invalid email format" }, { status: 400 })
+    }
 
-        return {
-          id: user._id.toString(),
-          email: user.email,
-          name: user.name,
-        }
-      },
-    }),
-  ],
-  session: {
-    strategy: "jwt", // ✅ important
-  },
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id
-        token.email = user.email
-        token.name = user.name
-      }
-      return token
-    },
-    async session({ session, token }) {
-      if (token) {
-        session.user = {
-          id: token.id,
-          email: token.email,
-          name: token.name,
-        }
-      }
-      return session
-    },
-  },
-  pages: {
-    signIn: "/login",
-  },
-})
+    const user = await findUserByEmail(email.toLowerCase())
+    if (!user) {
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
+    }
 
-export { handler as GET, handler as POST }
+    const isPasswordValid = await verifyPassword(password, user.password)
+    if (!isPasswordValid) {
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
+    }
+
+    const token = generateToken({
+      userId: user._id!.toString(),
+      email: user.email,
+      name: user.name,
+    })
+
+    // ✅ Cookie me token set karte hai
+    const response = NextResponse.json(
+      { message: "Login successful", user: { id: user._id, email: user.email, name: user.name } },
+      { status: 200 }
+    )
+    response.cookies.set("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    })
+
+    return response
+  } catch (error) {
+    console.error("Login error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
