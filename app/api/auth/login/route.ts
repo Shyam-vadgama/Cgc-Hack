@@ -1,58 +1,59 @@
-import { NextResponse } from "next/server"
-import { verifyPassword, generateToken } from "@/lib/auth"
+import NextAuth from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+import { verifyPassword } from "@/lib/auth"
 import { findUserByEmail } from "@/lib/db/users"
 
-export async function POST(req: Request) {
-  try {
-    const body = await req.json()
-    const { email, password } = body
-
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 }
-      )
-    }
-
-    // Find user in DB
-    const user = await findUserByEmail(email)
-    if (!user) {
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
-      )
-    }
-
-    // Verify password
-    const isValid = await verifyPassword(password, user.password)
-    if (!isValid) {
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
-      )
-    }
-
-    // Generate JWT
-    const token = generateToken({
-      userId: user._id.toString(),
-      email: user.email,
-      name: user.name,
-    })
-
-    return NextResponse.json({
-      message: "Login successful",
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
+const handler = NextAuth({
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
       },
-    })
-  } catch (err) {
-    console.error("Login API error:", err)
-    return NextResponse.json(
-      { error: "Something went wrong" },
-      { status: 500 }
-    )
-  }
-}
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null
+
+        const user = await findUserByEmail(credentials.email)
+        if (!user) return null
+
+        const isValid = await verifyPassword(credentials.password, user.password)
+        if (!isValid) return null
+
+        return {
+          id: user._id.toString(),
+          email: user.email,
+          name: user.name,
+        }
+      },
+    }),
+  ],
+  session: {
+    strategy: "jwt", // ✅ important
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id
+        token.email = user.email
+        token.name = user.name
+      }
+      return token
+    },
+    async session({ session, token }) {
+      if (token) {
+        session.user = {
+          id: token.id,
+          email: token.email,
+          name: token.name,
+        }
+      }
+      return session
+    },
+  },
+  pages: {
+    signIn: "/login",
+  },
+})
+
+export { handler as GET, handler as POST }
