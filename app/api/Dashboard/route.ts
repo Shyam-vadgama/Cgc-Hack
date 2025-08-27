@@ -1,55 +1,79 @@
-import { NextRequest, NextResponse } from "next/server"
-import { verifyToken } from "@/lib/auth"
-import { findUserById } from "@/lib/db/users"
+"use client"
 
-export async function GET(request: NextRequest) {
-  try {
-    const authHeader = request.headers.get("authorization")
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+export default function LoginPage() {
+  const router = useRouter()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError("")
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        // Save token
+        localStorage.setItem("token", data.token)
+
+        // Redirect to dashboard
+        router.push("/dashboard")
+      } else {
+        setError(data.error || "Login failed")
+      }
+    } catch (err) {
+      setError("Something went wrong")
+    } finally {
+      setLoading(false)
     }
-
-    const token = authHeader.split(" ")[1]
-    const decoded = verifyToken(token) as { userId: string }
-
-    if (!decoded?.userId) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
-    }
-
-    const user = await findUserById(decoded.userId)
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
-    }
-
-    // return data without password
-    const { password, ...userData } = user
-
-    return NextResponse.json({ user: userData }, { status: 200 })
-  } catch (error) {
-    console.error("Dashboard API Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-}
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { userId, newPassword } = body
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <form
+        onSubmit={handleLogin}
+        className="bg-white p-6 rounded shadow-md w-96"
+      >
+        <h2 className="text-xl font-bold mb-4 text-center">Login</h2>
 
-    if (!userId || !newPassword) {
-      return NextResponse.json({ error: "Missing fields" }, { status: 400 })
-    }
+        {error && <p className="text-red-500 mb-2">{error}</p>}
 
-    // 👇 apne DB function use karna (hash password bhi karna yaha)
-    // await updateUserPassword(userId, newPassword)
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full border p-2 mb-3 rounded"
+        />
 
-    return NextResponse.json(
-      { message: "Password reset successful" },
-      { status: 200 }
-    )
-  } catch (error) {
-    console.error("Password reset error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full border p-2 mb-3 rounded"
+        />
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+        >
+          {loading ? "Logging in..." : "Login"}
+        </button>
+      </form>
+    </div>
+  )
 }
