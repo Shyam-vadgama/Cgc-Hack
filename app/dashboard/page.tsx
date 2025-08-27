@@ -7,25 +7,25 @@ export default function DashboardPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
+  const [data, setData] = useState<any>(null)
 
   useEffect(() => {
-    // Check token from localStorage
     const token = localStorage.getItem("token")
 
     if (!token) {
-      router.replace("/login") // Agar token nahi hai to login pe bhej
+      router.replace("/login")
     } else {
-      // Yaha tu API call karke user data nikal sakta hai
-      fetch("/api/auth/me", {
+      fetch("/api/dashboard", {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
-        .then((data) => {
-          if (data.error) {
+        .then((res) => {
+          if (res.error) {
             localStorage.removeItem("token")
             router.replace("/login")
           } else {
-            setUser(data)
+            setUser(res.user)
+            setData(res.data)
           }
           setLoading(false)
         })
@@ -42,6 +42,24 @@ export default function DashboardPage() {
     <div className="min-h-screen flex flex-col items-center justify-center">
       <h1 className="text-2xl font-bold">Welcome to Dashboard 🚀</h1>
       {user && <p className="mt-2">Logged in as {user.email}</p>}
+
+      {data && (
+        <div className="mt-4 text-center">
+          <h2 className="font-semibold">Courses:</h2>
+          <ul>
+            {data.courses.map((c: string, i: number) => (
+              <li key={i}>{c}</li>
+            ))}
+          </ul>
+
+          <h2 className="font-semibold mt-2">Notifications:</h2>
+          <ul>
+            {data.notifications.map((n: string, i: number) => (
+              <li key={i}>{n}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <button
         className="mt-4 bg-red-500 text-white px-4 py-2 rounded"
