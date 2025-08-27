@@ -1,11 +1,9 @@
-// app/api/dashboard/route.ts
 import { type NextRequest, NextResponse } from "next/server"
-import { verifyToken } from "@/lib/auth"  // JWT verify karne wala function
-import { findUserById } from "@/lib/db/users" // DB se user data nikalne wala
+import { verifyToken } from "@/lib/auth"
+import { findUserById } from "@/lib/db/users"
 
 export async function GET(req: NextRequest) {
   try {
-    // 1. Header se token nikal
     const authHeader = req.headers.get("authorization")
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -17,8 +15,8 @@ export async function GET(req: NextRequest) {
 
     const token = authHeader.split(" ")[1]
 
-    // 2. Token verify
-    const decoded = verifyToken(token)
+    // ✅ Token verify
+    const decoded = await verifyToken(token).catch(() => null)
     if (!decoded) {
       return NextResponse.json(
         { error: "Unauthorized: Invalid token" },
@@ -26,8 +24,10 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // 3. DB se user fetch
-    const user = await findUserById(decoded.userId)
+    console.log("Decoded JWT:", decoded)
+
+    // ✅ DB se user fetch
+    const user = await findUserById(decoded.userId || decoded.id)
     if (!user) {
       return NextResponse.json(
         { error: "User not found" },
@@ -35,7 +35,6 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // 4. User-specific dashboard data
     return NextResponse.json({
       message: "Dashboard data fetched successfully",
       user: {
@@ -51,8 +50,8 @@ export async function GET(req: NextRequest) {
         ],
       },
     })
-  } catch (error) {
-    console.error("Dashboard API error:", error)
+  } catch (error: any) {
+    console.error("Dashboard API error:", error.message || error)
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
