@@ -2,12 +2,19 @@
 
 import { useAuth } from "@/hooks/use-auth"
 import { UserNav } from "@/components/auth/user-nav"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { LogOut, KeyRound, UserCog, Settings } from "lucide-react"
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth()
+  const { user, loading, logout } = useAuth()
 
   if (loading) {
     return (
@@ -40,21 +47,30 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
+      {/* Header */}
+      <header className="border-b sticky top-0 bg-background/80 backdrop-blur z-10">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <UserNav />
         </div>
       </header>
 
+      {/* Main */}
       <main className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold mb-2">Welcome back, {user.name}!</h2>
-            <p className="text-muted-foreground">You're successfully authenticated and viewing a protected page.</p>
+        <div className="max-w-5xl mx-auto">
+          {/* Welcome Section */}
+          <div className="mb-8 text-center">
+            <h2 className="text-3xl font-bold mb-2">
+              Welcome back, {user.name} 👋
+            </h2>
+            <p className="text-muted-foreground">
+              You're successfully authenticated and can manage your account.
+            </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          {/* Grid Layout */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Profile Card */}
             <Card>
               <CardHeader>
                 <CardTitle>Your Profile</CardTitle>
@@ -69,23 +85,55 @@ export default function DashboardPage() {
                     <strong>Email:</strong> {user.email}
                   </p>
                   <p>
-                    <strong>Member since:</strong> {new Date(user.createdAt).toLocaleDateString()}
+                    <strong>Member since:</strong>{" "}
+                    {new Date(user.createdAt).toLocaleDateString()}
+                  </p>
+                  <p>
+                    <strong>Role:</strong>{" "}
+                    {user.role || "Standard User"}
                   </p>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Quick Actions */}
             <Card>
               <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Common tasks and settings</CardDescription>
+                <CardDescription>Manage your settings</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button asChild variant="outline" className="w-full bg-transparent">
-                  <Link href="/profile">Edit Profile</Link>
+                <Button asChild variant="outline" className="w-full flex items-center gap-2">
+                  <Link href="/profile">
+                    <UserCog size={18} /> Edit Profile
+                  </Link>
                 </Button>
-                <Button asChild variant="outline" className="w-full bg-transparent">
-                  <Link href="/settings">Account Settings</Link>
+                <Button asChild variant="outline" className="w-full flex items-center gap-2">
+                  <Link href="/settings">
+                    <Settings size={18} /> Account Settings
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* User Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle>User Management</CardTitle>
+                <CardDescription>Secure your account</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button asChild variant="outline" className="w-full flex items-center gap-2">
+                  <Link href="/change-password">
+                    <KeyRound size={18} /> Change Password
+                  </Link>
+                </Button>
+                <Button
+                  onClick={logout}
+                  variant="destructive"
+                  className="w-full flex items-center gap-2"
+                >
+                  <LogOut size={18} /> Logout
                 </Button>
               </CardContent>
             </Card>
