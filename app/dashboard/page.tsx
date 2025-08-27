@@ -1,145 +1,117 @@
 "use client"
 
-import { useAuth } from "@/hooks/use-auth"
-import { UserNav } from "@/components/auth/user-nav"
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import { LogOut, KeyRound, UserCog, Settings } from "lucide-react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
 export default function DashboardPage() {
-  const { user, loading, logout } = useAuth()
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [success, setSuccess] = useState("")
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
+  // Check login on mount
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+    } else {
+      // get user info from token or API
+      try {
+        const storedUser = localStorage.getItem("user")
+        if (storedUser) {
+          setUser(JSON.parse(storedUser))
+        }
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    setLoading(false)
+  }, [router])
+
+  // Handle logout
+  const handleLogout = () => {
+    localStorage.removeItem("token")
+    localStorage.removeItem("user")
+    router.push("/login")
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>You need to be logged in to view this page.</CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <Button asChild>
-              <Link href="/login">Sign In</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  // Handle password reset
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setSuccess("")
+
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user?.email,
+          newPassword,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setSuccess("Password updated successfully ✅")
+        setNewPassword("")
+      } else {
+        setError(data.error || "Failed to reset password")
+      }
+    } catch (err) {
+      setError("Something went wrong")
+    }
   }
+
+  if (loading) return <p className="text-center mt-10">Loading...</p>
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b sticky top-0 bg-background/80 backdrop-blur z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <UserNav />
-        </div>
-      </header>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+        <h1 className="text-2xl font-bold mb-4 text-center">Dashboard</h1>
 
-      {/* Main */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-5xl mx-auto">
-          {/* Welcome Section */}
-          <div className="mb-8 text-center">
-            <h2 className="text-3xl font-bold mb-2">
-              Welcome back, {user.name} 👋
-            </h2>
-            <p className="text-muted-foreground">
-              You're successfully authenticated and can manage your account.
-            </p>
-          </div>
+        {user ? (
+          <>
+            <p className="mb-2">Welcome, <span className="font-semibold">{user.name}</span></p>
+            <p className="mb-4 text-gray-600">{user.email}</p>
 
-          {/* Grid Layout */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Profile Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Profile</CardTitle>
-                <CardDescription>Manage your account information</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <p>
-                    <strong>Name:</strong> {user.name}
-                  </p>
-                  <p>
-                    <strong>Email:</strong> {user.email}
-                  </p>
-                  <p>
-                    <strong>Member since:</strong>{" "}
-                    {new Date(user.createdAt).toLocaleDateString()}
-                  </p>
-                  <p>
-                    <strong>Role:</strong>{" "}
-                    {user.role || "Standard User"}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <button
+              onClick={handleLogout}
+              className="w-full bg-red-500 text-white py-2 rounded hover:bg-red-600 mb-6"
+            >
+              Logout
+            </button>
 
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Manage your settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button asChild variant="outline" className="w-full flex items-center gap-2">
-                  <Link href="/profile">
-                    <UserCog size={18} /> Edit Profile
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="w-full flex items-center gap-2">
-                  <Link href="/settings">
-                    <Settings size={18} /> Account Settings
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
+            <form onSubmit={handlePasswordReset}>
+              <h2 className="text-lg font-semibold mb-2">Reset Password</h2>
 
-            {/* User Management */}
-            <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>Secure your account</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button asChild variant="outline" className="w-full flex items-center gap-2">
-                  <Link href="/change-password">
-                    <KeyRound size={18} /> Change Password
-                  </Link>
-                </Button>
-                <Button
-                  onClick={logout}
-                  variant="destructive"
-                  className="w-full flex items-center gap-2"
-                >
-                  <LogOut size={18} /> Logout
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </main>
+              {error && <p className="text-red-500 mb-2">{error}</p>}
+              {success && <p className="text-green-600 mb-2">{success}</p>}
+
+              <input
+                type="password"
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full border p-2 mb-3 rounded"
+                required
+              />
+
+              <button
+                type="submit"
+                className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+              >
+                Update Password
+              </button>
+            </form>
+          </>
+        ) : (
+          <p className="text-center text-gray-600">No user found</p>
+        )}
+      </div>
     </div>
   )
 }
